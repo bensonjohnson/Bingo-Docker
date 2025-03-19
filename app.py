@@ -62,14 +62,19 @@ def join():
 @app.route('/game/<room_id>')
 def game(room_id):
     username = session.get('username')
+    print(f"Game route accessed for room {room_id}, username from session: {username}")
+    
     if not username:
+        print(f"No username in session, redirecting to index")
         return redirect(url_for('index'))
     
     # Check if room exists
     room_data = redis_client.get(f'room:{room_id}')
     if not room_data:
+        print(f"Room {room_id} not found in Redis, redirecting to index")
         return redirect(url_for('index'))
     
+    print(f"Rendering game template for user {username} in room {room_id}")
     return render_template('game.html', room_id=room_id, username=username)
 
 # Socket.IO events
@@ -89,8 +94,9 @@ def handle_create_room(data):
     # Generate a unique room ID
     room_id = generate_room_id()
     
-    # Store user in session
+    # Store user in session and save it
     session['username'] = username
+    session.modified = True
     
     # Store room data in Redis
     room_data = {
@@ -123,8 +129,9 @@ def handle_join_room(data):
         emit('error', {'message': 'Invalid data'})
         return
     
-    # Store user in session
+    # Store user in session and save it
     session['username'] = username
+    session.modified = True
     
     # Check if room exists
     room_data_str = redis_client.get(f'room:{room_id}')
