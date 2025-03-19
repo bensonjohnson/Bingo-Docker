@@ -239,8 +239,10 @@ def handle_mark_cell(data):
         board[row][col]['marked'] = not board[row][col]['marked']
         
         # Check if player has bingo
-        has_bingo = check_bingo(board)
-        player_data['has_bingo'] = has_bingo
+        bingo_result = check_bingo(board)
+        player_data['has_bingo'] = bingo_result['has_bingo']
+        if bingo_result['has_bingo']:
+            player_data['winning_cells'] = bingo_result['winning_cells']
         player_data['board'] = board
         
         # Update player data in Redis
@@ -254,11 +256,14 @@ def handle_mark_cell(data):
             'marked': board[row][col]['marked']
         }, room=room_id)
         
-        # If player got bingo, notify the room with their board
-        if has_bingo:
+        # If player got bingo, notify the room with their board and winning info
+        if bingo_result['has_bingo']:
             emit('player_bingo', {
                 'username': username,
-                'board': board
+                'board': board,
+                'winning_cells': bingo_result['winning_cells'],
+                'winning_type': bingo_result['type'],
+                'winning_index': bingo_result['index']
             }, room=room_id)
 
 @socketio.on('disconnect')
@@ -268,26 +273,31 @@ def handle_disconnect():
 
 def check_bingo(board):
     size = len(board)
+    winning_cells = []
     
     # Check rows
     for i in range(size):
         if all(board[i][j]['marked'] for j in range(size)):
-            return True
+            winning_cells = [{'row': i, 'col': j} for j in range(size)]
+            return {'has_bingo': True, 'winning_cells': winning_cells, 'type': 'row', 'index': i}
     
     # Check columns
     for j in range(size):
         if all(board[i][j]['marked'] for i in range(size)):
-            return True
+            winning_cells = [{'row': i, 'col': j} for i in range(size)]
+            return {'has_bingo': True, 'winning_cells': winning_cells, 'type': 'column', 'index': j}
     
     # Check diagonal (top-left to bottom-right)
     if all(board[i][i]['marked'] for i in range(size)):
-        return True
+        winning_cells = [{'row': i, 'col': i} for i in range(size)]
+        return {'has_bingo': True, 'winning_cells': winning_cells, 'type': 'diagonal', 'index': 1}
     
     # Check diagonal (top-right to bottom-left)
     if all(board[i][size-1-i]['marked'] for i in range(size)):
-        return True
+        winning_cells = [{'row': i, 'col': size-1-i} for i in range(size)]
+        return {'has_bingo': True, 'winning_cells': winning_cells, 'type': 'diagonal', 'index': 2}
     
-    return False
+    return {'has_bingo': False, 'winning_cells': []}
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)

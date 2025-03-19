@@ -11,17 +11,19 @@
     <div class="container">
         <h1>Join a Bingo Game</h1>
         <div class="join-form">
-            <div class="form-group">
-                <label for="username">Your Name:</label>
-                <input type="text" id="username" placeholder="Enter your name" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="roomId">Room ID:</label>
-                <input type="text" id="roomId" placeholder="Enter the room ID" required>
-            </div>
-            
-            <button id="joinGame" class="btn join-btn">Join Game</button>
+            <form id="joinForm">
+                <div class="form-group">
+                    <label for="username">Your Name:</label>
+                    <input type="text" id="username" placeholder="Enter your name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="roomId">Room ID:</label>
+                    <input type="text" id="roomId" placeholder="Enter the room ID" required>
+                </div>
+                
+                <button type="submit" id="joinGame" class="btn join-btn">Join Game</button>
+            </form>
             <a href="{{ url_for('index') }}" class="btn-link">Back to Home</a>
         </div>
     </div>
@@ -29,7 +31,32 @@
     <script>
         const socket = io();
         
-        document.getElementById('joinGame').addEventListener('click', () => {
+        // Check URL for room ID parameter when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            
+            // If room ID is in the URL, pre-fill the field
+            if (roomParam) {
+                document.getElementById('roomId').value = roomParam;
+                
+                // Focus on the username field instead
+                document.getElementById('username').focus();
+                
+                // If we have a username in localStorage, pre-fill it
+                const storedUsername = localStorage.getItem('bingo_username');
+                if (storedUsername) {
+                    document.getElementById('username').value = storedUsername;
+                    // Focus on the join button
+                    document.getElementById('joinGame').focus();
+                }
+            }
+        });
+        
+        document.getElementById('joinForm').addEventListener('submit', (e) => {
+            e.preventDefault(); // Prevent form submission
+            
             const username = document.getElementById('username').value.trim();
             const roomId = document.getElementById('roomId').value.trim();
             

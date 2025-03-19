@@ -13,7 +13,8 @@
             <h1>Bingo Game</h1>
             <div class="game-info">
                 <p>Room ID: <span id="roomId">{{ room_id }}</span> 
-                    <button id="copyRoomId" class="btn-small">Copy</button>
+                    <button id="copyRoomId" class="btn-small">Copy ID</button>
+                    <button id="shareLink" class="btn-small">Share Link</button>
                 </p>
                 <p>Playing as: <span id="playerName">{{ username }}</span></p>
             </div>
@@ -61,11 +62,98 @@
         let hasBingo = false;
         let winners = [];
         
-        // Join the room when page loads
-        socket.emit('join_room', {
-            username: username,
-            room_id: roomId
-        });
+        // Show join dialog if no username is provided
+        function showJoinDialog() {
+            // Create modal container
+            const modalOverlay = document.createElement('div');
+            modalOverlay.className = 'modal-overlay';
+            modalOverlay.style.zIndex = '2000';
+            
+            const modal = document.createElement('div');
+            modal.className = 'join-modal';
+            modal.style.backgroundColor = 'white';
+            modal.style.padding = '20px';
+            modal.style.borderRadius = '8px';
+            modal.style.width = '90%';
+            modal.style.maxWidth = '400px';
+            modal.style.textAlign = 'center';
+            
+            const title = document.createElement('h2');
+            title.textContent = 'Join Game';
+            title.style.marginBottom = '20px';
+            
+            const inputLabel = document.createElement('label');
+            inputLabel.textContent = 'Your Name:';
+            inputLabel.style.display = 'block';
+            inputLabel.style.marginBottom = '5px';
+            inputLabel.style.fontWeight = 'bold';
+            
+            const usernameInput = document.createElement('input');
+            usernameInput.type = 'text';
+            usernameInput.placeholder = 'Enter your name';
+            usernameInput.style.width = '100%';
+            usernameInput.style.padding = '10px';
+            usernameInput.style.marginBottom = '20px';
+            usernameInput.style.borderRadius = '4px';
+            usernameInput.style.border = '1px solid #ddd';
+            
+            const joinButton = document.createElement('button');
+            joinButton.textContent = 'Join Game';
+            joinButton.className = 'btn';
+            
+            // Handle join button click
+            joinButton.addEventListener('click', () => {
+                const name = usernameInput.value.trim();
+                if (name) {
+                    username = name;
+                    localStorage.setItem('bingo_username', username);
+                    document.getElementById('playerName').textContent = username;
+                    
+                    // Remove the modal
+                    document.body.removeChild(modalOverlay);
+                    
+                    // Join the room
+                    socket.emit('join_room', {
+                        username: username,
+                        room_id: roomId
+                    });
+                } else {
+                    alert('Please enter your name');
+                }
+            });
+            
+            // Add all elements to the modal
+            modal.appendChild(title);
+            modal.appendChild(inputLabel);
+            modal.appendChild(usernameInput);
+            modal.appendChild(joinButton);
+            
+            modalOverlay.appendChild(modal);
+            document.body.appendChild(modalOverlay);
+            
+            usernameInput.focus();
+        }
+
+        // Join the room when page loads, or show join dialog if no username
+        if (username && username !== 'None') {
+            socket.emit('join_room', {
+                username: username,
+                room_id: roomId
+            });
+        } else {
+            // Try to get username from localStorage
+            const storedUsername = localStorage.getItem('bingo_username');
+            if (storedUsername) {
+                username = storedUsername;
+                document.getElementById('playerName').textContent = username;
+                socket.emit('join_room', {
+                    username: username,
+                    room_id: roomId
+                });
+            } else {
+                showJoinDialog();
+            }
+        }
         
         // Handle room joined event
         socket.on('room_joined', (data) => {
@@ -113,6 +201,9 @@
         let originalBoard = null;
         let currentlyViewingWinner = null;
         
+        // Store the winning cells for highlighting
+        let winningCells = [];
+        
         // Handle player bingo event
         socket.on('player_bingo', (data) => {
             if (!winners.includes(data.username)) {
@@ -140,6 +231,7 @@
                     
                     // Update the board with the winner's board
                     board = data.board;
+                    winningCells = data.winning_cells;
                     document.getElementById('boardTitle').textContent = `${data.username}'s Winning Board`;
                     renderBoard();
                     
@@ -147,9 +239,11 @@
                     document.getElementById('viewYourBoard').style.display = 'block';
                 });
                 
-                // If the current user won, show bingo message
+                // If the current user won, show bingo message and store winning cells
                 if (data.username === username) {
                     showBingo();
+                    winningCells = data.winning_cells;
+                    renderBoard(); // Re-render to highlight winning cells
                 }
             }
         });
@@ -184,6 +278,11 @@
                     
                     if (board[i][j].marked) {
                         cell.classList.add('marked');
+                        
+                        // Check if this is part of a winning line
+                        if (winningCells.some(wc => wc.row === i && wc.col === j)) {
+                            cell.classList.add('winning-cell');
+                        }
                     }
                     
                     cell.addEventListener('click', () => handleCellClick(i, j));
@@ -233,12 +332,26 @@
             });
         });
         
+        // Share game link
+        document.getElementById('shareLink').addEventListener('click', () => {
+            const joinURL = window.location.origin + '/join?room=' + roomId;
+            navigator.clipboard.writeText(joinURL).then(() => {
+                alert('Game link copied to clipboard! Share it with others to join this game.');
+            });
+        });
+        
         // Handle "View Your Board" button click
         document.getElementById('viewYourBoard').addEventListener('click', () => {
             if (originalBoard) {
                 // Restore the player's original board
                 board = originalBoard;
                 document.getElementById('boardTitle').textContent = 'Your Bingo Board';
+                
+                // Clear winning cells highlight if not the winner
+                if (!hasBingo) {
+                    winningCells = [];
+                }
+                
                 renderBoard();
                 
                 // Hide the button
