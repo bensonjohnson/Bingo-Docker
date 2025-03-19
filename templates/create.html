@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Bingo Game</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
     <div class="container">
@@ -17,10 +20,14 @@
             </div>
             
             <div class="form-group">
-                <label for="phrases">Bingo Phrases:</label>
-                <p class="hint">Enter at least 24 phrases (one per line). These will be used to create bingo boards for all players.</p>
-                <textarea id="phrases" rows="10" placeholder="Enter bingo phrases (one per line)"></textarea>
-                <button id="addSample" class="btn-secondary">Load Sample Phrases</button>
+                <label for="phraseInputs">Bingo Phrases:</label>
+                <p class="hint">Enter at least 24 phrases. These will be used to create bingo boards for all players.</p>
+                <div id="phraseInputs" class="phrases-container">
+                    <!-- Individual phrase inputs will be generated here -->
+                </div>
+                <div class="phrases-actions">
+                    <button id="addSample" class="btn-secondary">Load Sample Phrases</button>
+                </div>
             </div>
             
             <button id="createGame" class="btn create-btn">Create Game</button>
@@ -30,24 +37,143 @@
 
     <script>
         const socket = io();
+        const NUM_PHRASE_INPUTS = 25; // We want 25 inputs (5x5 board with free space)
+        
+        // Store all saved phrases
+        let savedPhrases = [];
+        
+        // Initialize the phrase input boxes
+        function initPhraseInputs() {
+            const phraseInputs = document.getElementById('phraseInputs');
+            phraseInputs.innerHTML = '';
+            
+            // Get saved phrases right away
+            socket.emit('get_saved_phrases');
+            
+            for (let i = 0; i < NUM_PHRASE_INPUTS; i++) {
+                const inputContainer = document.createElement('div');
+                inputContainer.className = 'phrase-input-container';
+                
+                // Create a select element with autocomplete
+                const selectInput = document.createElement('select');
+                selectInput.className = 'phrase-input';
+                selectInput.id = 'phrase-' + i;
+                
+                // Add an empty default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = `Phrase ${i + 1}`;
+                selectInput.appendChild(defaultOption);
+                
+                inputContainer.appendChild(selectInput);
+                phraseInputs.appendChild(inputContainer);
+                
+                // Initialize Select2 on this input
+                $(selectInput).select2({
+                    tags: true, // Allow new entries
+                    placeholder: `Phrase ${i + 1}`,
+                    width: '100%',
+                    allowClear: true,
+                    theme: "classic",
+                    dropdownParent: inputContainer,
+                    createTag: function (params) {
+                        return {
+                            id: params.term,
+                            text: params.term,
+                            newTag: true
+                        };
+                    }
+                });
+                
+                // Ensure proper sizing
+                $(window).resize(function() {
+                    $('.select2-container').css('width', '100%');
+                });
+            }
+        }
+        
+        // Update phrase suggestions when we receive saved phrases
+        socket.on('saved_phrases', (data) => {
+            if (data.phrases && data.phrases.length > 0) {
+                savedPhrases = data.phrases;
+                
+                // Update each select with the available phrases
+                for (let i = 0; i < NUM_PHRASE_INPUTS; i++) {
+                    const select = $('#phrase-' + i);
+                    
+                    // Clear existing options except the default empty one
+                    select.find('option:not(:first)').remove();
+                    
+                    // Add all saved phrases as options
+                    savedPhrases.forEach(phrase => {
+                        const option = new Option(phrase, phrase, false, false);
+                        select.append(option);
+                    });
+                    
+                    // Refresh Select2
+                    select.trigger('change');
+                }
+            }
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initPhraseInputs();
+        });
+        
+        // Collect phrases from Select2 inputs
+        function collectPhrases() {
+            const phrases = [];
+            
+            for (let i = 0; i < NUM_PHRASE_INPUTS; i++) {
+                const value = $('#phrase-' + i).val();
+                if (value) {
+                    phrases.push(value);
+                }
+            }
+            
+            return phrases;
+        }
+        
+        // Fill phrase inputs with provided phrases
+        function fillPhraseInputs(phrases) {
+            // Clear existing inputs
+            for (let i = 0; i < NUM_PHRASE_INPUTS; i++) {
+                $('#phrase-' + i).val('').trigger('change');
+            }
+            
+            // Fill with provided phrases
+            phrases.forEach((phrase, index) => {
+                if (index < NUM_PHRASE_INPUTS) {
+                    // Create the option if it doesn't exist
+                    if (!$('#phrase-' + index).find(`option[value="${phrase}"]`).length) {
+                        const newOption = new Option(phrase, phrase, true, true);
+                        $('#phrase-' + index).append(newOption);
+                    }
+                    
+                    $('#phrase-' + index).val(phrase).trigger('change');
+                }
+            });
+        }
         
         document.getElementById('createGame').addEventListener('click', () => {
             const username = document.getElementById('username').value.trim();
-            const phrasesText = document.getElementById('phrases').value.trim();
+            const phrases = collectPhrases();
             
             if (!username) {
                 alert('Please enter your name');
                 return;
             }
             
-            const phrases = phrasesText.split('\n')
-                .map(phrase => phrase.trim())
-                .filter(phrase => phrase.length > 0);
-            
             if (phrases.length < 24) {
                 alert('Please enter at least 24 phrases');
                 return;
             }
+            
+            // Save phrases to Redis for future use
+            socket.emit('save_phrases', {
+                phrases: phrases
+            });
             
             socket.emit('create_room', {
                 username: username,
@@ -67,6 +193,7 @@
         socket.on('error', (data) => {
             alert(data.message);
         });
+        
         
         // Load sample phrases
         document.getElementById('addSample').addEventListener('click', () => {
@@ -97,7 +224,8 @@
                 "Phone rings during meeting",
                 "Someone asks 'can everyone hear me?'"
             ];
-            document.getElementById('phrases').value = samplePhrases.join('\n');
+            
+            fillPhraseInputs(samplePhrases);
         });
     </script>
 </body>

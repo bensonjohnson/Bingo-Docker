@@ -87,6 +87,42 @@ def game(room_id):
 def handle_connect():
     print('Client connected')
 
+@socketio.on('save_phrases')
+def handle_save_phrases(data):
+    phrases = data.get('phrases', [])
+    
+    if not phrases:
+        emit('error', {'message': 'No phrases to save'})
+        return
+    
+    # Get existing phrases from Redis
+    saved_phrases_str = redis_client.get('saved_phrases')
+    saved_phrases = []
+    
+    if saved_phrases_str:
+        saved_phrases = json.loads(saved_phrases_str)
+    
+    # Add new phrases, avoiding duplicates
+    for phrase in phrases:
+        if phrase not in saved_phrases:
+            saved_phrases.append(phrase)
+    
+    # Save back to Redis
+    redis_client.set('saved_phrases', json.dumps(saved_phrases))
+    
+    emit('phrases_saved', {'count': len(saved_phrases)})
+
+@socketio.on('get_saved_phrases')
+def handle_get_saved_phrases():
+    # Get saved phrases from Redis
+    saved_phrases_str = redis_client.get('saved_phrases')
+    saved_phrases = []
+    
+    if saved_phrases_str:
+        saved_phrases = json.loads(saved_phrases_str)
+    
+    emit('saved_phrases', {'phrases': saved_phrases})
+
 @socketio.on('create_room')
 def handle_create_room(data):
     username = data.get('username')
