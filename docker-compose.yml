@@ -13,7 +13,7 @@ services:
     command: python app.py
 
   redis:
-    image: ":alpineredis"
+    image: "redis:alpine"
     ports:
       - "6379:6379"
     volumes:
