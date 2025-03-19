@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import random
+import re
 from flask import Flask, render_template, request, session, redirect, url_for
 from flask_socketio import SocketIO, join_room, leave_room, emit
 import redis
@@ -18,6 +19,37 @@ redis_client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_respon
 # Helper functions
 def generate_room_id():
     return str(uuid.uuid4())[:8]
+
+def validate_username(username):
+    """
+    Validates username to prevent command injection and ensure it meets requirements.
+    Returns (is_valid, error_message) tuple.
+    """
+    # Check if username is empty or None
+    if not username or not isinstance(username, str):
+        return False, "Username cannot be empty"
+    
+    # Check length (3-20 characters)
+    if len(username) < 3 or len(username) > 20:
+        return False, "Username must be between 3 and 20 characters"
+    
+    # Only allow alphanumeric characters and some safe symbols
+    # This regex pattern allows letters, numbers, spaces, and common safe symbols
+    if not re.match(r'^[A-Za-z0-9 _.,-]+$', username):
+        return False, "Username contains invalid characters. Use only letters, numbers, spaces, and basic punctuation"
+    
+    # Check for potentially dangerous sequences
+    dangerous_patterns = [
+        ';', '&', '|', '>', '<', '$', '`', '\\', 
+        'eval', 'exec', 'System', 'bash', 'cmd', 
+        'powershell', 'script', 'function'
+    ]
+    
+    for pattern in dangerous_patterns:
+        if pattern in username:
+            return False, "Username contains invalid characters"
+    
+    return True, ""
 
 def generate_bingo_board(phrases, size=5):
     # Create a copy of phrases to avoid modifying the original
@@ -67,6 +99,12 @@ def game(room_id):
     
     if not username:
         print(f"No username found, redirecting to index")
+        return redirect(url_for('index'))
+    
+    # Validate username
+    is_valid, error_message = validate_username(username)
+    if not is_valid:
+        print(f"Invalid username: {error_message}")
         return redirect(url_for('index'))
     
     # Store username in session anyway for future requests
@@ -132,6 +170,12 @@ def handle_create_room(data):
         emit('error', {'message': 'Invalid data'})
         return
     
+    # Validate username
+    is_valid, error_message = validate_username(username)
+    if not is_valid:
+        emit('error', {'message': error_message})
+        return
+    
     # Generate a unique room ID
     room_id = generate_room_id()
     
@@ -168,6 +212,12 @@ def handle_join_room(data):
     
     if not username or not room_id:
         emit('error', {'message': 'Invalid data'})
+        return
+    
+    # Validate username
+    is_valid, error_message = validate_username(username)
+    if not is_valid:
+        emit('error', {'message': error_message})
         return
     
     # Store user in session and save it
