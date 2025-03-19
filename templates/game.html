@@ -81,10 +81,17 @@
         // Handle player joined event
         socket.on('player_joined', (data) => {
             const playerList = document.getElementById('playerList');
-            const playerItem = document.createElement('li');
-            playerItem.textContent = data.username;
-            playerItem.id = 'player-' + data.username;
-            playerList.appendChild(playerItem);
+            // Check if the player is already in the list to avoid duplicates
+            const existingPlayer = document.getElementById('player-' + data.username);
+            if (!existingPlayer) {
+                const playerItem = document.createElement('li');
+                playerItem.textContent = data.username;
+                playerItem.id = 'player-' + data.username;
+                playerList.appendChild(playerItem);
+                console.log('Added player to list:', data.username);
+            } else {
+                console.log('Player already in list:', data.username);
+            }
         });
         
         // Handle cell marked event

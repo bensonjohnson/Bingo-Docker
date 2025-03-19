@@ -163,8 +163,8 @@ def handle_join_room(data):
     # Join the room
     join_room(room_id)
     
-    # Notify others that a new player joined
-    emit('player_joined', {'username': username}, room=room_id)
+    # Notify others (but not the current player) that a new player joined
+    emit('player_joined', {'username': username}, room=room_id, skip_sid=request.sid)
     
     # Get player's board
     player_data = json.loads(redis_client.get(f'player:{username}:{room_id}'))
