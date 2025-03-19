@@ -8,7 +8,7 @@ import redis
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'bingo-secret-key-change-in-production')
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", manage_session=False)
 
 # Redis configuration
 redis_host = os.environ.get('REDIS_HOST', 'localhost')
@@ -61,12 +61,17 @@ def join():
 
 @app.route('/game/<room_id>')
 def game(room_id):
-    username = session.get('username')
-    print(f"Game route accessed for room {room_id}, username from session: {username}")
+    # Get username from query parameter or fallback to session
+    username = request.args.get('username') or session.get('username')
+    print(f"Game route accessed for room {room_id}, username: {username}")
     
     if not username:
-        print(f"No username in session, redirecting to index")
+        print(f"No username found, redirecting to index")
         return redirect(url_for('index'))
+    
+    # Store username in session anyway for future requests
+    session['username'] = username
+    session.modified = True
     
     # Check if room exists
     room_data = redis_client.get(f'room:{room_id}')

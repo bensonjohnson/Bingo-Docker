@@ -57,10 +57,11 @@
         
         socket.on('room_created', (data) => {
             console.log('Room created with ID:', data.room_id);
-            // Add a small delay to allow session to be saved properly
-            setTimeout(() => {
-                window.location.href = '/game/' + data.room_id;
-            }, 500);
+            // Store username in localStorage
+            const username = document.getElementById('username').value.trim();
+            localStorage.setItem('bingo_username', username);
+            // Redirect with username as query parameter
+            window.location.href = '/game/' + data.room_id + '?username=' + encodeURIComponent(username);
         });
         
         socket.on('error', (data) => {

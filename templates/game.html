@@ -50,7 +50,12 @@
     <script>
         const socket = io();
         const roomId = '{{ room_id }}';
-        const username = '{{ username }}';
+        let username = '{{ username }}';
+        // Fallback to localStorage if username is not available from server
+        if (!username || username === 'None') {
+            username = localStorage.getItem('bingo_username');
+            console.log('Using username from localStorage:', username);
+        }
         let board = [];
         let hasBingo = false;
         let winners = [];

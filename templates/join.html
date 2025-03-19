@@ -50,7 +50,11 @@
         });
         
         socket.on('room_joined', (data) => {
-            window.location.href = '/game/' + data.room_id;
+            // Store username in localStorage
+            const username = document.getElementById('username').value.trim();
+            localStorage.setItem('bingo_username', username);
+            // Redirect with username as query parameter
+            window.location.href = '/game/' + data.room_id + '?username=' + encodeURIComponent(username);
         });
         
         socket.on('error', (data) => {
