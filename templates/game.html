@@ -21,11 +21,12 @@
         
         <div class="game-content">
             <div class="bingo-board-container">
-                <h2>Your Bingo Board</h2>
+                <h2 id="boardTitle">Your Bingo Board</h2>
                 <div class="bingo-board" id="bingoBoard">
                     <!-- Board will be generated dynamically -->
                 </div>
                 <div class="bingo-status" id="bingoStatus"></div>
+                <button id="viewYourBoard" class="btn-small" style="display: none;">View Your Board</button>
             </div>
             
             <div class="player-list-container">
@@ -108,15 +109,45 @@
             }
         });
         
+        // Store original player board
+        let originalBoard = null;
+        let currentlyViewingWinner = null;
+        
         // Handle player bingo event
         socket.on('player_bingo', (data) => {
             if (!winners.includes(data.username)) {
                 winners.push(data.username);
+                
+                // Add winner to the list
                 const winnersListElement = document.getElementById('winnersList');
                 const winnerItem = document.createElement('li');
-                winnerItem.textContent = data.username;
+                
+                // Make the winner's name clickable to view their board
+                winnerItem.innerHTML = `<a href="#" class="winner-link" data-username="${data.username}">${data.username}</a>`;
                 winnersListElement.appendChild(winnerItem);
                 
+                // Add click event to view this winner's board
+                winnerItem.querySelector('.winner-link').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    
+                    // Save the original board if not already saved
+                    if (!originalBoard) {
+                        originalBoard = JSON.parse(JSON.stringify(board));
+                    }
+                    
+                    // Track which winner we're viewing
+                    currentlyViewingWinner = data.username;
+                    
+                    // Update the board with the winner's board
+                    board = data.board;
+                    document.getElementById('boardTitle').textContent = `${data.username}'s Winning Board`;
+                    renderBoard();
+                    
+                    // Show the button to switch back to the user's board
+                    document.getElementById('viewYourBoard').style.display = 'block';
+                });
+                
+                // If the current user won, show bingo message
                 if (data.username === username) {
                     showBingo();
                 }
@@ -200,6 +231,22 @@
             navigator.clipboard.writeText(roomIdText).then(() => {
                 alert('Room ID copied to clipboard!');
             });
+        });
+        
+        // Handle "View Your Board" button click
+        document.getElementById('viewYourBoard').addEventListener('click', () => {
+            if (originalBoard) {
+                // Restore the player's original board
+                board = originalBoard;
+                document.getElementById('boardTitle').textContent = 'Your Bingo Board';
+                renderBoard();
+                
+                // Hide the button
+                document.getElementById('viewYourBoard').style.display = 'none';
+                
+                // Reset the tracking
+                currentlyViewingWinner = null;
+            }
         });
     </script>
 </body>

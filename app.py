@@ -218,9 +218,12 @@ def handle_mark_cell(data):
             'marked': board[row][col]['marked']
         }, room=room_id)
         
-        # If player got bingo, notify the room
+        # If player got bingo, notify the room with their board
         if has_bingo:
-            emit('player_bingo', {'username': username}, room=room_id)
+            emit('player_bingo', {
+                'username': username,
+                'board': board
+            }, room=room_id)
 
 @socketio.on('disconnect')
 def handle_disconnect():
