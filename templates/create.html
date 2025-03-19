@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Bingo Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Create a Bingo Game</h1>
+        <div class="create-form">
+            <div class="form-group">
+                <label for="username">Your Name:</label>
+                <input type="text" id="username" placeholder="Enter your name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="phrases">Bingo Phrases:</label>
+                <p class="hint">Enter at least 24 phrases (one per line). These will be used to create bingo boards for all players.</p>
+                <textarea id="phrases" rows="10" placeholder="Enter bingo phrases (one per line)"></textarea>
+                <button id="addSample" class="btn-secondary">Load Sample Phrases</button>
+            </div>
+            
+            <button id="createGame" class="btn create-btn">Create Game</button>
+            <a href="{{ url_for('index') }}" class="btn-link">Back to Home</a>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        
+        document.getElementById('createGame').addEventListener('click', () => {
+            const username = document.getElementById('username').value.trim();
+            const phrasesText = document.getElementById('phrases').value.trim();
+            
+            if (!username) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            const phrases = phrasesText.split('\n')
+                .map(phrase => phrase.trim())
+                .filter(phrase => phrase.length > 0);
+            
+            if (phrases.length < 24) {
+                alert('Please enter at least 24 phrases');
+                return;
+            }
+            
+            socket.emit('create_room', {
+                username: username,
+                phrases: phrases
+            });
+        });
+        
+        socket.on('room_created', (data) => {
+            window.location.href = '/game/' + data.room_id;
+        });
+        
+        socket.on('error', (data) => {
+            alert(data.message);
+        });
+        
+        // Load sample phrases
+        document.getElementById('addSample').addEventListener('click', () => {
+            const samplePhrases = [
+                "Someone mentions the weather",
+                "Coffee break is mentioned",
+                "Technical difficulties",
+                "Someone says 'let's circle back'",
+                "Someone joins late",
+                "Someone's pet appears",
+                "Awkward silence",
+                "Someone apologizes for background noise",
+                "Someone is on mute when trying to speak",
+                "Someone says 'can you see my screen?'",
+                "Internet connection issues",
+                "Someone multitasking",
+                "Someone has to leave early",
+                "Someone shares the wrong screen",
+                "Meeting goes over scheduled time",
+                "Someone says 'we lost you for a second'",
+                "Someone mentions being busy",
+                "Email mentioned during call",
+                "Someone's doorbell rings",
+                "Someone uses corporate jargon",
+                "Someone hasn't read the pre-meeting materials",
+                "A child or family member interrupts",
+                "Someone says 'quick question'",
+                "Phone rings during meeting",
+                "Someone asks 'can everyone hear me?'"
+            ];
+            document.getElementById('phrases').value = samplePhrases.join('\n');
+        });
+    </script>
+</body>
+</html>
