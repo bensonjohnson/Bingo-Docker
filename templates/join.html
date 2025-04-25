@@ -29,5 +29,24 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/join.js') }}"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const saved = localStorage.getItem('theme') ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', saved);
+        const container = document.createElement('div'); container.id = 'theme-toggle';
+        const btn = document.createElement('button');
+        btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+        btn.addEventListener('click', function() {
+            const curr = document.documentElement.getAttribute('data-theme');
+            const next = curr === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            btn.textContent = next === 'dark' ? '☀️' : '🌙';
+        });
+        container.appendChild(btn);
+        document.body.appendChild(container);
+    });
+    </script>
 </body>
 </html>
