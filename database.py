@@ -40,6 +40,13 @@ class Database:
         
     def add_player_to_room(self, room_id, username):
         """Add a player to a room"""
+        # Potential race condition:
+        # This function follows a read-modify-write pattern. If multiple requests
+        # execute this concurrently, they might fetch the same room_data,
+        # both modify their local copies, and then the last write will overwrite
+        # the previous one, leading to a lost update for the players list.
+        # To ensure atomicity, Redis transactions (MULTI/EXEC) or a Lua script
+        # should be used to perform the get, append, and set operations as a single atomic unit.
         room_data = self.get_room(room_id)
         if not room_data:
             return None
@@ -79,6 +86,15 @@ class Database:
     
     def save_phrases(self, phrases):
         """Save phrases to Redis for future use"""
+        # Potential race condition:
+        # This function reads the list of saved phrases, modifies it locally,
+        # and then writes it back. If multiple requests do this concurrently,
+        # they might base their modifications on a stale list, and the last
+        # write operation would overwrite changes made by others, leading to
+        # lost phrase additions.
+        # Redis transactions (MULTI/EXEC) or a Lua script could ensure that
+        # fetching, appending new unique phrases, and saving the list back
+        # happens atomically.
         saved_phrases_str = self.client.get('saved_phrases')
         saved_phrases = []
         

@@ -39,6 +39,9 @@ def validate_username(username):
 
 def generate_bingo_board(phrases, size=5):
     """Generate a randomized bingo board from a list of phrases"""
+    if not phrases: # Check if phrases list is empty
+        return []   # Return empty board
+
     # Create a copy of phrases to avoid modifying the original
     phrases_copy = phrases.copy()
     # Shuffle phrases
