@@ -27,18 +27,19 @@ def join():
 
 @app.route('/game/<room_id>')
 def game(room_id):
-    # Get username from query parameter or fallback to session
-    username = request.args.get('username') or session.get('username')
-    print(f"Game route accessed for room {room_id}, username: {username}")
-    
+    # Get username
+    username = request.args.get('username')
     if not username:
-        print(f"No username found, redirecting to index")
+        username = session.get('username')
+
+    if not username:
         return redirect(url_for('index'))
     
     # Validate username
     is_valid, error_message = validate_username(username)
     if not is_valid:
-        print(f"Invalid username: {error_message}")
+        # Clear potentially invalid username from session
+        session.pop('username', None) 
         return redirect(url_for('index'))
     
     # Store username in session for future requests
@@ -48,16 +49,14 @@ def game(room_id):
     # Check if room exists
     room_data = db.get_room(room_id)
     if not room_data:
-        print(f"Room {room_id} not found in Redis, redirecting to index")
         return redirect(url_for('index'))
     
-    print(f"Rendering game template for user {username} in room {room_id}")
     return render_template('game.html', room_id=room_id, username=username)
 
 # Socket.IO event handlers
 @socketio.on('connect')
 def handle_connect():
-    print('Client connected')
+    pass
 
 @socketio.on('save_phrases')
 def handle_save_phrases(data):
@@ -167,10 +166,12 @@ def handle_mark_cell(data):
     
     # Get player's data
     player_data = db.get_player(username, room_id)
+    
+    # Check if player_data exists before accessing its keys
     if not player_data:
         emit('error', {'message': 'Player data not found'})
         return
-    
+        
     board = player_data['board']
     
     # Toggle the marked state of the cell
@@ -208,7 +209,7 @@ def handle_mark_cell(data):
 @socketio.on('disconnect')
 def handle_disconnect():
     username = session.get('username')
-    print(f'Client disconnected: {username}')
+    pass
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
